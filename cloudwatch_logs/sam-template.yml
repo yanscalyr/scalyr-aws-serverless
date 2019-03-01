@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >-
+  CloudWatch2Scalyr Deployment Template
+
+Parameters:
+  BaseUrl:
+    Description: Base URL of the Scalyr API
+    Type: String
+    Default: 'https://www.scalyr.com'
+    AllowedValues: ['https://www.scalyr.com', 'https://eu.scalyr.com']
+  WriteLogsKey:
+    Description: 'Use this or WriteLogsKeyEncrypted.
+                  The Scalyr API key that allows write access to Scalyr logs'
+    Type: String
+    Default: ''
+  WriteLogsKeyEncrypted:
+    Description: 'Use this or WriteLogsKey.
+                  The encrypted Scalyr API key that allows write access to Scalyr logs'
+    Type: String
+    Default: ''
+  LogGroupOptions:
+    Description: Valid JSON string to customise log delivery
+    Type: String
+    Default: '{}'
+  AutoSubscribeLogGroups:
+    Description: Automatically subscribe the logGroups defined in LogGroupOptions to the cloudwatch2scalyr lambda
+    Type: String
+    Default: false
+    AllowedValues: [true, false]
+  Debug:
+    Description: Enable debug logging of each request
+    Type: String
+    Default: false
+    AllowedValues: [true, false]
+
+Conditions:
+  WriteLogsKeyPlaintext:
+    !Not [!Equals [!Ref WriteLogsKey, '']]
+  WriteLogsKeyEncrypted:
+    !Not [!Equals [!Ref WriteLogsKeyEncrypted, '']]
+
+Resources:
+  LogGroupSubscriptionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'logs:DescribeLogGroups'
+              - 'logs:DeleteSubscriptionFilter'
+              - 'logs:PutSubscriptionFilter'
+            Resource: '*'
+  CFCustomResourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.7
+      Handler: main.lambda_handler
+      CodeUri: ./cf_lambda
+      Timeout: 300
+      Policies:
+        - !Ref LogGroupSubscriptionPolicy
+  CloudWatch2ScalyrHelper:
+    Type: Custom::CustomResource
+    Properties:
+      ServiceToken: !GetAtt CFCustomResourceFunction.Arn
+      LogGroupOptions: !Ref LogGroupOptions
+      AutoSubscribeLogGroups: !Ref AutoSubscribeLogGroups
+      DestinationArn: !GetAtt CloudWatch2ScalyrFunction.Arn
+  KMSDecryptPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+            Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*'
+  CloudWatch2ScalyrFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.7
+      Handler: main.lambda_handler
+      CodeUri: ./lambda
+      Policies:
+        - !Ref KMSDecryptPolicy
+      Environment:
+        Variables:
+          BASE_URL: !Ref BaseUrl
+          WRITE_LOGS_KEY:
+            Fn::If: [WriteLogsKeyPlaintext, !Ref WriteLogsKey, !Ref 'AWS::NoValue']
+          WRITE_LOGS_KEY_ENCRYPTED:
+            Fn::If: [WriteLogsKeyEncrypted, !Ref WriteLogsKeyEncrypted, !Ref 'AWS::NoValue']
+          LOG_GROUP_OPTIONS: !Ref LogGroupOptions
+          DEBUG: !Ref Debug
+  CloudWatch2ScalyrPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref CloudWatch2ScalyrFunction
+      Principal: !Sub 'logs.${AWS::Region}.amazonaws.com'
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*'
+
+Outputs:
+  CloudWatch2ScalyrArn:
+    Description: The arn of the CloudWatch2Scalyr function.
+    Value: !GetAtt CloudWatch2ScalyrFunction.Arn

@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Conditions:
+  WriteLogsKeyEncrypted:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: WriteLogsKeyEncrypted
+      - ''
+  WriteLogsKeyPlaintext:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: WriteLogsKey
+      - ''
+Description: CloudWatch2Scalyr Deployment Template
+Outputs:
+  CloudWatch2ScalyrArn:
+    Description: The arn of the CloudWatch2Scalyr function.
+    Value:
+      Fn::GetAtt:
+      - CloudWatch2ScalyrFunction
+      - Arn
+Parameters:
+  AutoSubscribeLogGroups:
+    AllowedValues:
+    - true
+    - false
+    Default: false
+    Description: Automatically subscribe the logGroups defined in LogGroupOptions
+      to the cloudwatch2scalyr lambda
+    Type: String
+  BaseUrl:
+    AllowedValues:
+    - https://www.scalyr.com
+    - https://eu.scalyr.com
+    Default: https://www.scalyr.com
+    Description: Base URL of the Scalyr API
+    Type: String
+  Debug:
+    AllowedValues:
+    - true
+    - false
+    Default: false
+    Description: Enable debug logging of each request
+    Type: String
+  LogGroupOptions:
+    Default: '{}'
+    Description: Valid JSON string to customise log delivery
+    Type: String
+  WriteLogsKey:
+    Default: ''
+    Description: Use this or WriteLogsKeyEncrypted. The Scalyr API key that allows
+      write access to Scalyr logs
+    Type: String
+  WriteLogsKeyEncrypted:
+    Default: ''
+    Description: Use this or WriteLogsKey. The encrypted Scalyr API key that allows
+      write access to Scalyr logs
+    Type: String
+Resources:
+  CFCustomResourceFunction:
+    Properties:
+      CodeUri: s3://devcloudwatch2scalyr/7013420e3bcb2e25c3ac0a328b65e2f5
+      Handler: main.lambda_handler
+      Policies:
+      - Ref: LogGroupSubscriptionPolicy
+      Runtime: python3.7
+      Timeout: 300
+    Type: AWS::Serverless::Function
+  CloudWatch2ScalyrFunction:
+    Properties:
+      CodeUri: s3://devcloudwatch2scalyr/0a1389c325b5ac4d3525fcf94aa47685
+      Environment:
+        Variables:
+          BASE_URL:
+            Ref: BaseUrl
+          DEBUG:
+            Ref: Debug
+          LOG_GROUP_OPTIONS:
+            Ref: LogGroupOptions
+          WRITE_LOGS_KEY:
+            Fn::If:
+            - WriteLogsKeyPlaintext
+            - Ref: WriteLogsKey
+            - Ref: AWS::NoValue
+          WRITE_LOGS_KEY_ENCRYPTED:
+            Fn::If:
+            - WriteLogsKeyEncrypted
+            - Ref: WriteLogsKeyEncrypted
+            - Ref: AWS::NoValue
+      Handler: main.lambda_handler
+      Policies:
+      - Ref: KMSDecryptPolicy
+      Runtime: python3.7
+    Type: AWS::Serverless::Function
+  CloudWatch2ScalyrHelper:
+    Properties:
+      AutoSubscribeLogGroups:
+        Ref: AutoSubscribeLogGroups
+      DestinationArn:
+        Fn::GetAtt:
+        - CloudWatch2ScalyrFunction
+        - Arn
+      LogGroupOptions:
+        Ref: LogGroupOptions
+      ServiceToken:
+        Fn::GetAtt:
+        - CFCustomResourceFunction
+        - Arn
+    Type: Custom::CustomResource
+  CloudWatch2ScalyrPermission:
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: CloudWatch2ScalyrFunction
+      Principal:
+        Fn::Sub: logs.${AWS::Region}.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*
+    Type: AWS::Lambda::Permission
+  KMSDecryptPolicy:
+    Properties:
+      PolicyDocument:
+        Statement:
+        - Action:
+          - kms:Decrypt
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*
+        Version: 2012-10-17
+    Type: AWS::IAM::ManagedPolicy
+  LogGroupSubscriptionPolicy:
+    Properties:
+      PolicyDocument:
+        Statement:
+        - Action:
+          - logs:DescribeLogGroups
+          - logs:DeleteSubscriptionFilter
+          - logs:PutSubscriptionFilter
+          Effect: Allow
+          Resource: '*'
+        Version: 2012-10-17
+    Type: AWS::IAM::ManagedPolicy
+Transform: AWS::Serverless-2016-10-31
