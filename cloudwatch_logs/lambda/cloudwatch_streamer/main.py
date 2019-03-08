@@ -56,11 +56,11 @@ LOG_GROUP_OPTIONS = os.environ.get('LOG_GROUP_OPTIONS')
 LOG_GROUP_OPTIONS = json.loads(LOG_GROUP_OPTIONS)
 
 
-class Cloudwatch2ScalyrException(Exception):
+class CloudWatchStreamerException(Exception):
     """A custom exception class to print extra context before exiting"""
 
     def __init__(self, message, context=''):
-        LOGGER.exception(f"Cloudwatch2Scalyr Exception: {message}")
+        LOGGER.exception(f"CloudWatch Streamer Exception: {message}")
         if DEBUG and context != '':
             print(f"Exception Context: \n\n{context}\n\n", file=sys.stderr)
         logging.shutdown()
@@ -86,7 +86,7 @@ def encode_url_params(params):
     try:
         encoded_params = urllib.parse.urlencode(params)
     except:
-        raise Cloudwatch2ScalyrException('Couldn\'t encode url params', params)
+        raise CloudWatchStreamerException('Couldn\'t encode url params', params)
     else:
         return encoded_params
 
@@ -94,7 +94,7 @@ def encode_url_params(params):
 def encode_post_data(data):
     """Encodes a string of log-lines separated by '\n' into byte data
 
-    @param data: A string containing each log-line from the Cloudwatch Logs message separated
+    @param data: A string containing each log-line from the CloudWatch Logs message separated
         by '\n' as required by the uploadLogs API
     @type param: str
 
@@ -104,7 +104,7 @@ def encode_post_data(data):
     try:
         encoded_data = data.encode('utf-8')
     except:
-        raise Cloudwatch2ScalyrException('Couldn\'t encode post data', data)
+        raise CloudWatchStreamerException('Couldn\'t encode post data', data)
     else:
         return encoded_data
 
@@ -117,7 +117,7 @@ def build_post_req(url, params, logEvents):
 
     @param url: The Scalyr uploadLogs API endpoint
     @param params: A dict of k:v parameters to be used in the request to the uploadLogs API
-    @param logEvents: A string containing each log-line from the Cloudwatch Logs message separated
+    @param logEvents: A string containing each log-line from the CloudWatch Logs message separated
         by '\n' as required by the uploadLogs API
 
     @type url: str
@@ -144,7 +144,7 @@ def decode_response_body(r):
     try:
         decoded_body = json.loads(r.read().decode('utf-8'))
     except:
-        raise Cloudwatch2ScalyrException('Couldn\'t decode response body', r.read())
+        raise CloudWatchStreamerException('Couldn\'t decode response body', r.read())
     else:
         return decoded_body
 
@@ -154,7 +154,7 @@ def post(url, params, logEvents):
 
     @param url: The Scalyr uploadLogs API endpoint
     @param params: A dict of k:v parameters to be used in the request to the uploadLogs API
-    @param logEvents: A string containing each log-line from the Cloudwatch Logs message separated
+    @param logEvents: A string containing each log-line from the CloudWatch Logs message separated
         by '\n' as required by the uploadLogs API
 
     @type url: str
@@ -168,7 +168,7 @@ def post(url, params, logEvents):
     try:
         r = urllib.request.urlopen(req)
     except urllib.error.HTTPError as e:
-        raise Cloudwatch2ScalyrException(
+        raise CloudWatchStreamerException(
             'Scalyr API returned HTTPError', json.dumps({
                 'statusCode': e.code,
                 'body': decode_response_body(e)
@@ -230,7 +230,7 @@ def build_post_data(message):
     @param message: The CloudWatch Logs message and associated metadata
     @type message: dict
 
-    @return: A string containing each log-line from the Cloudwatch Logs message separated
+    @return: A string containing each log-line from the CloudWatch Logs message separated
         by '\n' as required by the uploadLogs API
     @rtype: string
     """
@@ -289,7 +289,7 @@ def lambda_handler(event, context):
     @type context: LambdaContext
     """
     if not WRITE_LOGS_KEY:
-        raise Cloudwatch2ScalyrException('No Scalyr write logs key provided')
+        raise CloudWatchStreamerException('No Scalyr write logs key provided')
     cw_json_data = decode_cw_data(event['awslogs']['data'])
     params, logEvents = parse_message(cw_json_data)
     resp = post(UPLOAD_LOGS_URL, params, logEvents)

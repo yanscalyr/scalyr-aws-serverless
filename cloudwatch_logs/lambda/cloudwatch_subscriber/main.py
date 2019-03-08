@@ -16,7 +16,7 @@
 # ------------------------------------------------------------------------
 #
 # CloudFormation custom resource to subscribe CloudWatch logGroups to the
-# cloudWatch2scaylr2 lambda
+# CloudWatch Streamer Lambda Function
 #
 # author: Tom Gardiner <tom@teppen.io>
 import re
@@ -215,7 +215,7 @@ def put_subscription_filter(log_group_name, options, destination_arn):
     try:
         CWLOGS.put_subscription_filter(
             filterPattern=options.get('filterPattern', ''),
-            filterName=options.get('filterName', 'cloudwatch2scalyr'),
+            filterName=options.get('filterName', 'cloudWatchLogs'),
             logGroupName=log_group_name,
             destinationArn=destination_arn
         )
@@ -239,7 +239,7 @@ def delete_subscription_filter(log_group_name, options):
     """
     try:
         CWLOGS.delete_subscription_filter(
-            filterName=options.get('filterName', 'cloudwatch2scalyr'),
+            filterName=options.get('filterName', 'cloudWatchLogs'),
             logGroupName=log_group_name
         )
     except CWLOGS.exceptions.ResourceNotFoundException as e:

@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Description: >-
-  CloudWatch2Scalyr Deployment Template
+  Scalyr CloudWatch Logs Importer
 
 Parameters:
   BaseUrl:
@@ -25,7 +25,7 @@ Parameters:
     Type: String
     Default: '{}'
   AutoSubscribeLogGroups:
-    Description: Automatically subscribe the logGroups defined in LogGroupOptions to the cloudwatch2scalyr lambda
+    Description: Automatically subscribe the logGroups defined in LogGroupOptions to the CloudWatch Streamer Lambda function
     Type: String
     Default: false
     AllowedValues: [true, false]
@@ -54,22 +54,22 @@ Resources:
               - 'logs:DeleteSubscriptionFilter'
               - 'logs:PutSubscriptionFilter'
             Resource: '*'
-  CFCustomResourceFunction:
+  CloudWatchSubscriberFunction:
     Type: AWS::Serverless::Function
     Properties:
       Runtime: python3.7
       Handler: main.lambda_handler
-      CodeUri: ./cf_lambda
+      CodeUri: ./lambda/cloudwatch_subscriber
       Timeout: 300
       Policies:
         - !Ref LogGroupSubscriptionPolicy
-  CloudWatch2ScalyrHelper:
+  CloudWatchSubscriber:
     Type: Custom::CustomResource
     Properties:
-      ServiceToken: !GetAtt CFCustomResourceFunction.Arn
+      ServiceToken: !GetAtt CloudWatchSubscriberFunction.Arn
       LogGroupOptions: !Ref LogGroupOptions
       AutoSubscribeLogGroups: !Ref AutoSubscribeLogGroups
-      DestinationArn: !GetAtt CloudWatch2ScalyrFunction.Arn
+      DestinationArn: !GetAtt CloudWatchSubscriberFunction.Arn
   KMSDecryptPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -80,12 +80,12 @@ Resources:
             Action:
               - 'kms:Decrypt'
             Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*'
-  CloudWatch2ScalyrFunction:
+  CloudWatchStreamerFunction:
     Type: AWS::Serverless::Function
     Properties:
       Runtime: python3.7
       Handler: main.lambda_handler
-      CodeUri: ./lambda
+      CodeUri: ./lambda/cloudwatch_streamer
       Policies:
         - !Ref KMSDecryptPolicy
       Environment:
@@ -101,12 +101,15 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       Action: 'lambda:InvokeFunction'
-      FunctionName: !Ref CloudWatch2ScalyrFunction
+      FunctionName: !Ref CloudWatchStreamerFunction
       Principal: !Sub 'logs.${AWS::Region}.amazonaws.com'
       SourceAccount: !Ref 'AWS::AccountId'
       SourceArn: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*'
 
 Outputs:
-  CloudWatch2ScalyrArn:
-    Description: The arn of the CloudWatch2Scalyr function.
-    Value: !GetAtt CloudWatch2ScalyrFunction.Arn
+  CloudWatchStreamerArn:
+    Description: The arn of the CloudWatch Streamer function.
+    Value: !GetAtt CloudWatchStreamerFunction.Arn
+  CloudWatchSubscriberArn:
+    Description: The arn of the CloudWatch Subscriber function.
+    Value: !GetAtt CloudWatchSubscriberFunction.Arn
