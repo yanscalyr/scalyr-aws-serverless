@@ -15,7 +15,8 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 #
-# Forwards CloudWatch logs to Scalyr
+# Forwards CloudWatch logs to Scalyr using the uploadLogs API documented
+#  here: https://www.scalyr.com/help/api-uploadLogs
 #
 # author: Tom Gardiner <tom@teppen.io>
 import os
@@ -29,6 +30,9 @@ import urllib.request
 from uuid import uuid4
 from base64 import b64decode
 
+# Used as a way to identify the difference between warm and cold Lambda starts
+# Lambda will re-use environments for some time, they will share the same ENVIRONMENT_ID
+# Number of unique ENVIRONMENT_ID's == concurrent lambda invocations
 ENVIRONMENT_ID = uuid4().hex
 
 DEBUG = os.environ.get('DEBUG')
@@ -53,6 +57,8 @@ LOG_GROUP_OPTIONS = json.loads(LOG_GROUP_OPTIONS)
 
 
 class Cloudwatch2ScalyrException(Exception):
+    """A custom exception class to print extra context before exiting"""
+
     def __init__(self, message, context=''):
         LOGGER.exception(f"Cloudwatch2Scalyr Exception: {message}")
         if DEBUG and context != '':
@@ -61,13 +67,22 @@ class Cloudwatch2ScalyrException(Exception):
         sys.exit(1)
 
 
-def set_req_headers():
+def build_req_headers():
+    """Returns the request headers to be used for the Scalyr uploadLogs API request"""
     return {
         'Content-Type': 'text/plain'
     }
 
 
 def encode_url_params(params):
+    """Encodes a dict of k:v params as a URL-encoded string
+
+    @param params: A dict of k:v parameters to be used in the request to the uploadLogs API
+    @type params: dict
+
+    @return: URL-encoded parameters to be used in the uploadLogs API request
+    @rtype: str
+    """
     try:
         encoded_params = urllib.parse.urlencode(params)
     except:
@@ -77,6 +92,15 @@ def encode_url_params(params):
 
 
 def encode_post_data(data):
+    """Encodes a string of log-lines separated by '\n' into byte data
+
+    @param data: A string containing each log-line from the Cloudwatch Logs message separated
+        by '\n' as required by the uploadLogs API
+    @type param: str
+
+    @return: A bytestring to be used as POST data in the uploadLogs API request
+    @rtype: bytes
+    """
     try:
         encoded_data = data.encode('utf-8')
     except:
@@ -86,12 +110,37 @@ def encode_post_data(data):
 
 
 def build_post_req(url, params, logEvents):
+    """Builds a urllib request ready for submission to the Scalyr uploadLogs API
+
+    Combines the uploadLogs API url, request parameters and a bytestring of
+    log events into a urllib request
+
+    @param url: The Scalyr uploadLogs API endpoint
+    @param params: A dict of k:v parameters to be used in the request to the uploadLogs API
+    @param logEvents: A string containing each log-line from the Cloudwatch Logs message separated
+        by '\n' as required by the uploadLogs API
+
+    @type url: str
+    @type param: dict
+    @type: logEvents: str
+
+    @return:  The urllib.request ready for submission to the Scalyr uploadLogs API
+    @rtype: urllib.request
+    """
     url = url + '?' + encode_url_params(params)
     data = encode_post_data(logEvents)
-    return urllib.request.Request(url, data=data, headers=set_req_headers())
+    return urllib.request.Request(url, data=data, headers=build_req_headers())
 
 
 def decode_response_body(r):
+    """Decodes and returns the Scalyr uploadLogs API response
+
+    @param r: A urllib response object
+    @type r: urllib.response
+
+    @return: The uploadLogs API utf-8 decoded response body
+    @rtype: dict
+    """
     try:
         decoded_body = json.loads(r.read().decode('utf-8'))
     except:
@@ -101,6 +150,20 @@ def decode_response_body(r):
 
 
 def post(url, params, logEvents):
+    """Performs an HTTP POST to the Scalyr uploadLogs API
+
+    @param url: The Scalyr uploadLogs API endpoint
+    @param params: A dict of k:v parameters to be used in the request to the uploadLogs API
+    @param logEvents: A string containing each log-line from the Cloudwatch Logs message separated
+        by '\n' as required by the uploadLogs API
+
+    @type url: str
+    @type param: dict
+    @type: logEvents: str
+
+    @return: The HTTP status code and response body from Scalyr
+    @rtype: dict
+    """
     req = build_post_req(url, params, logEvents)
     try:
         r = urllib.request.urlopen(req)
@@ -118,16 +181,34 @@ def post(url, params, logEvents):
 
 
 def get_log_group_options(log_group):
+    """Attempts to match the logGroup from the CloudWatch Logs message to the JSON object
+    (LOG_GROUP_OPTIONS) provided in the Lambda environment using a regex full-match on the
+    name of the logGroup
+
+    @param log_group: The name of the logGroup from the CloudWatch Logs message
+    @type log_group: str
+
+    @return: An empty dict or a dict of options used to customise the request to the uploadLogs API
+    @rtype: dict
+    """
     log_group_options = {}
     for pattern, options in LOG_GROUP_OPTIONS.items():
         if re.fullmatch(pattern, log_group):
             log_group_options = options
-            LOGGER.info(f"{log_group} matches {pattern}")
-    LOGGER.info('logGroupOptions: ' + json.dumps(log_group_options))
+            LOGGER.debug(f"{log_group} matches {pattern}")
+    LOGGER.debug('logGroupOptions: ' + json.dumps(log_group_options))
     return log_group_options
 
 
 def build_params(message):
+    """Builds a dict of URL parameters extracted from the CloudWatch Logs message
+
+    @param message: The CloudWatch Logs message and associated metadata
+    @type message: dict
+
+    @return: A dict of k:v parameters to be used in the request to the uploadLogs API
+    @rtype: dict
+    """
     options = get_log_group_options(message['logGroup'])
     params = {
         'token': 'REDACTED',
@@ -138,35 +219,78 @@ def build_params(message):
         'server-environmentId': ENVIRONMENT_ID,
         'parser': options.get('parser', 'cloudWatchLogs')
     }
-    LOGGER.info(f"Built url params: {json.dumps(params)}")
+    LOGGER.debug(f"Built url params: {json.dumps(params)}")
     params['token'] = WRITE_LOGS_KEY
     return params
 
 
 def build_post_data(message):
-    data = '\n'.join(list(map(lambda e: e['message'].rstrip(), message['logEvents'])))
-    LOGGER.info(f"Post data: {data}")
-    return data
+    """Joins each log-line in the CloudWatch Logs message by '\n'
+
+    @param message: The CloudWatch Logs message and associated metadata
+    @type message: dict
+
+    @return: A string containing each log-line from the Cloudwatch Logs message separated
+        by '\n' as required by the uploadLogs API
+    @rtype: string
+    """
+    post_data = ''
+    for logEvent in message['logEvents']:
+        # Perform log manipulation here
+        post_data += logEvent if logEvent.endswith('\n') else logEvent + '\n'
+    LOGGER.debug(f"Post data: {post_data}")
+    return post_data
 
 
 def parse_message(message):
+    """Parses a CloudWatch Logs message
+
+    @param message: The CloudWatch Logs message and associated metadata
+    @type message: dict
+
+    @return: An array containing URL parameters and valid HTTP POST data ready for submission
+        to the uploadLogs API
+    @rtype: (dict, string)
+    """
     params = build_params(message)
     logEvents = build_post_data(message)
-    return [params, logEvents]
+    return params, logEvents
 
 
 def decode_cw_data(cw_data):
+    """Extracts and decodes CloudWatch Logs data
+    CloudWatch data is base64 encoded and gzip compressed
+
+    @param cw_data: The raw, gzipped CloudWatch Logs data
+    @type cw_data: bytestring
+
+    @return: The CloudWatch Logs message and associated metadata
+    @rtype: dict
+    """
     cw_zip_data = b64decode(cw_data)
     cw_raw_data = gzip.decompress(cw_zip_data)
     cw_json_data = json.loads(cw_raw_data)
-    LOGGER.info(f"CloudWatch Message: {json.dumps(cw_json_data)}")
+    LOGGER.debug(f"CloudWatch Message: {json.dumps(cw_json_data)}")
     return cw_json_data
 
 
 def lambda_handler(event, context):
+    """Invoked by AWS to process the event and associated context
+    https://docs.aws.amazon.com/lambda/latest/dg/python-programming-model-handler-types.html
+
+    1.) Extracts and decodes the CloudWatch Logs data from the Lambda event
+    2.) Parses the CloudWatch logs message into a urllib.request
+    3.) Performs an HTTP POST to the Scalyr uploadLogs API
+
+    @param event: The AWS event containing CloudWatch Logs data
+    @param context: Provides runtime information regarding the Lambda event
+
+    @type event: dict
+    @type context: LambdaContext
+    """
     if not WRITE_LOGS_KEY:
         raise Cloudwatch2ScalyrException('No Scalyr write logs key provided')
     cw_json_data = decode_cw_data(event['awslogs']['data'])
     params, logEvents = parse_message(cw_json_data)
     resp = post(UPLOAD_LOGS_URL, params, logEvents)
-    LOGGER.info(f"Scalyr response: {json.dumps(resp)}")
+    LOGGER.debug(f"Scalyr response: {json.dumps(resp)}")
