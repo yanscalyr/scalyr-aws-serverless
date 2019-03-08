@@ -232,12 +232,15 @@ def build_post_data(message):
 
     @return: A string containing each log-line from the CloudWatch Logs message separated
         by '\n' as required by the uploadLogs API
-    @rtype: string
+    @rtype: str
     """
     post_data = ''
     for logEvent in message['logEvents']:
         # Perform log manipulation here
-        post_data += logEvent if logEvent.endswith('\n') else logEvent + '\n'
+        if logEvent['message'].endswith('\n'):
+            post_data += logEvent['message']
+        else:
+            post_data += logEvent['message'] + '\n'
     LOGGER.debug(f"Post data: {post_data}")
     return post_data
 
@@ -250,7 +253,7 @@ def parse_message(message):
 
     @return: An array containing URL parameters and valid HTTP POST data ready for submission
         to the uploadLogs API
-    @rtype: (dict, string)
+    @rtype: (dict, str)
     """
     params = build_params(message)
     logEvents = build_post_data(message)
@@ -262,7 +265,7 @@ def decode_cw_data(cw_data):
     CloudWatch data is base64 encoded and gzip compressed
 
     @param cw_data: The raw, gzipped CloudWatch Logs data
-    @type cw_data: bytestring
+    @type cw_data: bytes
 
     @return: The CloudWatch Logs message and associated metadata
     @rtype: dict

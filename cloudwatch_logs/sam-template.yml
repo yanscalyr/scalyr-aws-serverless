@@ -42,7 +42,7 @@ Conditions:
     !Not [!Equals [!Ref WriteLogsKeyEncrypted, '']]
 
 Resources:
-  LogGroupSubscriptionPolicy:
+  CloudWatchSubscriberPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       PolicyDocument:
@@ -50,6 +50,8 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - 'lambda:AddPermission'
+              - 'lambda:RemovePermission'
               - 'logs:DescribeLogGroups'
               - 'logs:DeleteSubscriptionFilter'
               - 'logs:PutSubscriptionFilter'
@@ -62,14 +64,16 @@ Resources:
       CodeUri: ./lambda/cloudwatch_subscriber
       Timeout: 300
       Policies:
-        - !Ref LogGroupSubscriptionPolicy
+        - !Ref CloudWatchSubscriberPolicy
   CloudWatchSubscriber:
     Type: Custom::CustomResource
     Properties:
       ServiceToken: !GetAtt CloudWatchSubscriberFunction.Arn
       LogGroupOptions: !Ref LogGroupOptions
       AutoSubscribeLogGroups: !Ref AutoSubscribeLogGroups
-      DestinationArn: !GetAtt CloudWatchSubscriberFunction.Arn
+      DestinationArn: !GetAtt CloudWatchStreamerFunction.Arn
+      AccountId: !Ref 'AWS::AccountId'
+      Region: !Ref 'AWS::Region'
   KMSDecryptPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -97,14 +101,6 @@ Resources:
             Fn::If: [WriteLogsKeyEncrypted, !Ref WriteLogsKeyEncrypted, !Ref 'AWS::NoValue']
           LOG_GROUP_OPTIONS: !Ref LogGroupOptions
           DEBUG: !Ref Debug
-  CloudWatch2ScalyrPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: 'lambda:InvokeFunction'
-      FunctionName: !Ref CloudWatchStreamerFunction
-      Principal: !Sub 'logs.${AWS::Region}.amazonaws.com'
-      SourceAccount: !Ref 'AWS::AccountId'
-      SourceArn: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*'
 
 Outputs:
   CloudWatchStreamerArn:
