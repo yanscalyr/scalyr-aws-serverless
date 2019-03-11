@@ -233,7 +233,7 @@ def lambda_add_permission(log_group_name, destination_arn, account_id, region):
         )
     except LAMBDA.exceptions.ResourceConflictException as e:
         # The statement id provided already exists, we must have added the permission in a previous run
-        LOGGER.info(f"Error adding lambda permission: {log_group_name}: {e}")
+        LOGGER.info(f"Warning, lambda permission already exists. No action taken: {e}")
     except:
         LOGGER.exception(f"Error adding lambda permission: {log_group_name}")
         raise
@@ -258,7 +258,7 @@ def lambda_remove_permission(log_group_name, destination_arn):
             StatementId=uuid5(UUID_SEED, log_group_name).hex
         )
     except LAMBDA.exceptions.ResourceNotFoundException as e:
-        LOGGER.info(f"Error removing lambda permission: {log_group_name}: {e}")
+        LOGGER.info(f"Warning, lambda permission doesn't exist. No action taken: {e}")
     except:
         LOGGER.exception(f"Error removing lambda permission: {log_group_name}")
         raise
@@ -311,7 +311,7 @@ def delete_subscription_filter(log_group_name, options):
             logGroupName=log_group_name
         )
     except CWLOGS.exceptions.ResourceNotFoundException as e:
-        LOGGER.info(f"Error unsubscribing: {log_group_name}: {e}")
+        LOGGER.info(f"Warning, logGroup subscription doesn't exist. No action taken: {e}")
     except:
         LOGGER.exception(f"Error unsubscribing: {log_group_name}")
         raise
