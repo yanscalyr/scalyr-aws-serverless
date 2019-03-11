@@ -38,8 +38,9 @@ LAMBDA = boto3.client('lambda')
 # Sends a FAILED response to CloudFormation X seconds before the lambda times out
 LAMBDA_TIMEOUT = 15
 
-# A seed for later UUID calls as we need a reproducible way to produce the StatementId
-# for Lambda the permission policy
+# Used to generate the StatementId in the lambda_add_permission and lambda_remove_permission
+# functions. The StatementId is an alphanumeric string and must be identical across Lambda
+# invokations as we need to reference it in subsequent calls to the AWS API
 UUID_SEED = UUID('e4ce7ea4-1343-427a-9e51-a22aad3dd0a8')
 
 
@@ -223,6 +224,7 @@ def lambda_add_permission(log_group_name, destination_arn, account_id, region):
     try:
         LAMBDA.add_permission(
             FunctionName=destination_arn,
+            # Uses the seed to generate a reproducible alphanumeric string
             StatementId=uuid5(UUID_SEED, log_group_name).hex,
             Action='lambda:InvokeFunction',
             Principal=f"logs.{region}.amazonaws.com",
@@ -230,6 +232,7 @@ def lambda_add_permission(log_group_name, destination_arn, account_id, region):
             SourceAccount=account_id
         )
     except LAMBDA.exceptions.ResourceConflictException as e:
+        # The statement id provided already exists, we must have added the permission in a previous run
         LOGGER.info(f"Error adding lambda permission: {log_group_name}: {e}")
     except:
         LOGGER.exception(f"Error adding lambda permission: {log_group_name}")
@@ -251,6 +254,7 @@ def lambda_remove_permission(log_group_name, destination_arn):
     try:
         LAMBDA.remove_permission(
             FunctionName=destination_arn,
+            # Uses the seed to generate a reproducible alphanumeric string
             StatementId=uuid5(UUID_SEED, log_group_name).hex
         )
     except LAMBDA.exceptions.ResourceNotFoundException as e:
@@ -359,7 +363,7 @@ def process_cf_event(event):
                         lambda_add_permission(log_group_name, destination_arn, account_id, region)
                         put_subscription_filter(log_group_name, options, destination_arn)
             for log_group_name, options in old_matched_log_group_options.items():
-                # Attempt to delete subcription filters for logGroups are no longer defined
+                # Attempt to delete subcription filters for logGroups that are no longer defined
                 if log_group_name in deleted:
                     delete_subscription_filter(log_group_name, options)
                     lambda_remove_permission(log_group_name, destination_arn)
