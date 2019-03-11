@@ -10,13 +10,19 @@ Conditions:
     - Fn::Equals:
       - Ref: WriteLogsKey
       - ''
-Description: CloudWatch2Scalyr Deployment Template
+Description: Scalyr CloudWatch Logs Importer
 Outputs:
-  CloudWatch2ScalyrArn:
-    Description: The arn of the CloudWatch2Scalyr function.
+  CloudWatchStreamerArn:
+    Description: The arn of the CloudWatch Streamer function.
     Value:
       Fn::GetAtt:
-      - CloudWatch2ScalyrFunction
+      - CloudWatchStreamerFunction
+      - Arn
+  CloudWatchSubscriberArn:
+    Description: The arn of the CloudWatch Subscriber function.
+    Value:
+      Fn::GetAtt:
+      - CloudWatchSubscriberFunction
       - Arn
 Parameters:
   AutoSubscribeLogGroups:
@@ -25,7 +31,7 @@ Parameters:
     - false
     Default: false
     Description: Automatically subscribe the logGroups defined in LogGroupOptions
-      to the cloudwatch2scalyr lambda
+      to the CloudWatch Streamer Lambda function
     Type: String
   BaseUrl:
     AllowedValues:
@@ -56,18 +62,21 @@ Parameters:
       write access to Scalyr logs
     Type: String
 Resources:
-  CFCustomResourceFunction:
+  CloudWatch2ScalyrPermission:
     Properties:
-      CodeUri: s3://devcloudwatch2scalyr/7013420e3bcb2e25c3ac0a328b65e2f5
-      Handler: main.lambda_handler
-      Policies:
-      - Ref: LogGroupSubscriptionPolicy
-      Runtime: python3.7
-      Timeout: 300
-    Type: AWS::Serverless::Function
-  CloudWatch2ScalyrFunction:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: CloudWatchStreamerFunction
+      Principal:
+        Fn::Sub: logs.${AWS::Region}.amazonaws.com
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*
+    Type: AWS::Lambda::Permission
+  CloudWatchStreamerFunction:
     Properties:
-      CodeUri: s3://devcloudwatch2scalyr/0a1389c325b5ac4d3525fcf94aa47685
+      CodeUri: s3://devcloudwatch2scalyr/cloudwatch_logs/56bf224c2852ed216a44647e728331ad
       Environment:
         Variables:
           BASE_URL:
@@ -91,33 +100,30 @@ Resources:
       - Ref: KMSDecryptPolicy
       Runtime: python3.7
     Type: AWS::Serverless::Function
-  CloudWatch2ScalyrHelper:
+  CloudWatchSubscriber:
     Properties:
       AutoSubscribeLogGroups:
         Ref: AutoSubscribeLogGroups
       DestinationArn:
         Fn::GetAtt:
-        - CloudWatch2ScalyrFunction
+        - CloudWatchSubscriberFunction
         - Arn
       LogGroupOptions:
         Ref: LogGroupOptions
       ServiceToken:
         Fn::GetAtt:
-        - CFCustomResourceFunction
+        - CloudWatchSubscriberFunction
         - Arn
     Type: Custom::CustomResource
-  CloudWatch2ScalyrPermission:
+  CloudWatchSubscriberFunction:
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName:
-        Ref: CloudWatch2ScalyrFunction
-      Principal:
-        Fn::Sub: logs.${AWS::Region}.amazonaws.com
-      SourceAccount:
-        Ref: AWS::AccountId
-      SourceArn:
-        Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*
-    Type: AWS::Lambda::Permission
+      CodeUri: s3://devcloudwatch2scalyr/cloudwatch_logs/f0640b361f99d212ce7b8c7e28ce78af
+      Handler: main.lambda_handler
+      Policies:
+      - Ref: LogGroupSubscriptionPolicy
+      Runtime: python3.7
+      Timeout: 300
+    Type: AWS::Serverless::Function
   KMSDecryptPolicy:
     Properties:
       PolicyDocument:

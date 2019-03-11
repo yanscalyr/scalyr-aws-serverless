@@ -15,8 +15,8 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 #
-# CloudFormation custom resource to subscribe CloudWatch logGroups to the
-# cloudWatch2scaylr2 lambda
+# CloudFormation Custom Resource to subscribe CloudWatch logGroups to the
+# Scalyr CloudWatch Streamer Lambda Function
 #
 # author: Tom Gardiner <tom@teppen.io>
 import re
@@ -24,22 +24,31 @@ import json
 import boto3
 import signal
 import logging
+from uuid import UUID, uuid5
 from botocore.vendored import requests
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
-# Create an AWS CloudWatch Logs client, to interact with the AWS API
+# Create an AWS CloudWatch Logs client, to interact with the CloudWatch API
 CWLOGS = boto3.client('logs')
+# Create an AWS Lambda client, to interact with the Lambda API
+LAMBDA = boto3.client('lambda')
 
 # Sends a FAILED response to CloudFormation X seconds before the lambda times out
 LAMBDA_TIMEOUT = 15
+
+# Used to generate the StatementId in the lambda_add_permission and lambda_remove_permission
+# functions. The StatementId is an alphanumeric string and must be identical across Lambda
+# invokations as we need to reference it in subsequent calls to the AWS API
+UUID_SEED = UUID('e4ce7ea4-1343-427a-9e51-a22aad3dd0a8')
 
 
 def build_resp_headers(json_resp_body):
     """Returns the headers to be used for the CloudFormation response"""
     return {
-        # This is required for the pre-signed URL, requests may add a default unsigned content-type
+        # This is required for the pre-signed URL, requests may add a default unsigned
+        # content-type
         'content-type': '',
         'content-length': str(len(json_resp_body))
     }
@@ -100,7 +109,7 @@ def load_log_group_options(event, resource_properties):
         'OldResourceProperties': Only exists on Update events
 
     @type event: dict
-    @type resource_properties: string
+    @type resource_properties: str
 
     @return: The logGroupOptions provided by the CloudFormation event
     @rtype: dict
@@ -198,6 +207,65 @@ def diff_log_groups(log_group_options, old_log_group_options):
     return added, set(updated), deleted
 
 
+def lambda_add_permission(log_group_name, destination_arn, account_id, region):
+    """Adds a lambda:InvokeFunction permission statement to the Streamer Lambda fuction
+    which allows the CloudWatch logGroup to deliver logEvents
+
+    @param log_group_name: The name of the logGroup in AWS
+    @param destination_arn: The ARN of the Lambda function to subcribe the logGroup to
+    @param account_id: The Account Id of the AWS account, from the CloudFormation Event
+    @param region: The AWS region, from the CloudFormation Event
+
+    @type log_group_name: str
+    @type destination_arn: str
+    @type account_id: str
+    @type region: str
+    """
+    try:
+        LAMBDA.add_permission(
+            FunctionName=destination_arn,
+            # Uses the seed to generate a reproducible alphanumeric string
+            StatementId=uuid5(UUID_SEED, log_group_name).hex,
+            Action='lambda:InvokeFunction',
+            Principal=f"logs.{region}.amazonaws.com",
+            SourceArn=f"arn:aws:logs:{region}:{account_id}:log-group:{log_group_name}:*",
+            SourceAccount=account_id
+        )
+    except LAMBDA.exceptions.ResourceConflictException as e:
+        # The statement id provided already exists, we must have added the permission in a previous run
+        LOGGER.info(f"Warning, lambda permission already exists. No action taken: {e}")
+    except:
+        LOGGER.exception(f"Error adding lambda permission: {log_group_name}")
+        raise
+    else:
+        LOGGER.info(f"Added lambda permission: {log_group_name}")
+
+
+def lambda_remove_permission(log_group_name, destination_arn):
+    """Removes the lambda:InvokeFunction permission statement from the Streamer Lambda
+    fuction, the logGroup will no longer be allowed to deliver logEvents
+
+    @param log_group_name: The name of the logGroup in AWS
+    @param destination_arn: The ARN of the Lambda function to subcribe the logGroup to
+
+    @type log_group_name: str
+    @type destination_arn: str
+    """
+    try:
+        LAMBDA.remove_permission(
+            FunctionName=destination_arn,
+            # Uses the seed to generate a reproducible alphanumeric string
+            StatementId=uuid5(UUID_SEED, log_group_name).hex
+        )
+    except LAMBDA.exceptions.ResourceNotFoundException as e:
+        LOGGER.info(f"Warning, lambda permission doesn't exist. No action taken: {e}")
+    except:
+        LOGGER.exception(f"Error removing lambda permission: {log_group_name}")
+        raise
+    else:
+        LOGGER.info(f"Removed lambda permission: {log_group_name}")
+
+
 def put_subscription_filter(log_group_name, options, destination_arn):
     """Creates or updates a CloudWatch Logs Subscription Filter to deliver new log events to
     our lambda function which are then forwarded to Scalyr in near real-time.
@@ -208,22 +276,22 @@ def put_subscription_filter(log_group_name, options, destination_arn):
         of the filter
     @param destination_arn: The ARN of the Lambda function to subcribe the logGroup to
 
-    @type log_group_name: string
+    @type log_group_name: str
     @type options: dict
     @type destination_arn: str
     """
     try:
         CWLOGS.put_subscription_filter(
             filterPattern=options.get('filterPattern', ''),
-            filterName=options.get('filterName', 'cloudwatch2scalyr'),
+            filterName=options.get('filterName', 'cloudWatchLogs'),
             logGroupName=log_group_name,
             destinationArn=destination_arn
         )
     except:
-        LOGGER.exception(f"Error subscribing logGroup: {log_group_name}")
+        LOGGER.exception(f"Error subscribing: {log_group_name}")
         raise
     else:
-        LOGGER.info(f"Subscribed logGroup: {log_group_name}")
+        LOGGER.info(f"Subscribed: {log_group_name}")
 
 
 def delete_subscription_filter(log_group_name, options):
@@ -239,16 +307,16 @@ def delete_subscription_filter(log_group_name, options):
     """
     try:
         CWLOGS.delete_subscription_filter(
-            filterName=options.get('filterName', 'cloudwatch2scalyr'),
+            filterName=options.get('filterName', 'cloudWatchLogs'),
             logGroupName=log_group_name
         )
     except CWLOGS.exceptions.ResourceNotFoundException as e:
-        LOGGER.info(f"Error unsubscribing logGroup: {log_group_name}: {e}")
+        LOGGER.info(f"Warning, logGroup subscription doesn't exist. No action taken: {e}")
     except:
-        LOGGER.exception(f"Error unsubscribing logGroup: {log_group_name}")
+        LOGGER.exception(f"Error unsubscribing: {log_group_name}")
         raise
     else:
-        LOGGER.info(f"Unsubscribed logGroup: {log_group_name}")
+        LOGGER.info(f"Unsubscribed: {log_group_name}")
 
 
 def process_cf_event(event):
@@ -265,6 +333,8 @@ def process_cf_event(event):
     """
     auto_subscribe_log_groups = event['ResourceProperties']['AutoSubscribeLogGroups']
     destination_arn = event['ResourceProperties']['DestinationArn']
+    account_id = event['ResourceProperties']['AccountId']
+    region = event['ResourceProperties']['Region']
 
     if auto_subscribe_log_groups == 'true':
         aws_log_groups = get_log_groups()
@@ -273,20 +343,34 @@ def process_cf_event(event):
 
         if event['RequestType'] == 'Create':
             for log_group_name, options in matched_log_group_options.items():
+                lambda_add_permission(log_group_name, destination_arn, account_id, region)
                 put_subscription_filter(log_group_name, options, destination_arn)
         elif event['RequestType'] == 'Update':
             old_log_group_options = load_log_group_options(event, 'OldResourceProperties')
             old_matched_log_group_options = match_log_groups(aws_log_groups, old_log_group_options)
             added, updated, deleted = diff_log_groups(matched_log_group_options, old_matched_log_group_options)
-            for log_group_name, options in matched_log_group_options.items():
-                if log_group_name in added or log_group_name in updated:
+            if event['OldResourceProperties']['AutoSubscribeLogGroups'] == 'false':
+                # We don't know the current state of the subscription filters as we weren't in charge
+                for log_group_name, options in matched_log_group_options.items():
+                    # So create/update subscription filters for all the logGroups that matched
+                    lambda_add_permission(log_group_name, destination_arn, account_id, region)
                     put_subscription_filter(log_group_name, options, destination_arn)
+            else:
+                # We were in charge previously
+                for log_group_name, options in matched_log_group_options.items():
+                    # So only create/update subscription filters for added or updated logGroups
+                    if log_group_name in added or log_group_name in updated:
+                        lambda_add_permission(log_group_name, destination_arn, account_id, region)
+                        put_subscription_filter(log_group_name, options, destination_arn)
             for log_group_name, options in old_matched_log_group_options.items():
+                # Attempt to delete subcription filters for logGroups that are no longer defined
                 if log_group_name in deleted:
                     delete_subscription_filter(log_group_name, options)
+                    lambda_remove_permission(log_group_name, destination_arn)
         elif event['RequestType'] == 'Delete':
             for log_group_name, options in matched_log_group_options.items():
                 delete_subscription_filter(log_group_name, options)
+                lambda_remove_permission(log_group_name, destination_arn)
 
 
 def lambda_handler(event, context):

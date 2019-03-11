@@ -1,49 +1,43 @@
 # Scalyr CloudWatch Logs Importer
 
-* [cloudwatch2scalyr](#cloudwatch2scalyr)
+* [Scalyr CloudWatch Logs Importer](#scalyr-cloudWatch-logs-importer)
   * [Features](#features)
   * [Requirements](#requirements)
   * [Deployment](#deployment)
-    * [Deploy Using the AWS Serverless Repository](#deploy-using-the-aws-serverless-repository)
     * [Using CloudFormation](#using-cloudformation)
   * [Configuration](#configuration)
     * [Customizing LogGroupOptions](#customizing-loggroupoptions)
       * [Using regex to customise log delivery options](#using-regex-to-customise-log-delivery-options)
       * [LogGroupOptions defaults](#loggroupoptions-defaults)
-    * [Automatically subscribing CloudWatch logGroups to cloudwatch2scalyr](#automatically-subscribing-cloudwatch-loggroups-to-cloudwatch2scalyr)
+    * [Automatically subscribing CloudWatch logGroups](#automatically-subscribing-cloudwatch-loggroups)
   * [Troubleshooting](#troubleshooting)
 
 Amazon CloudWatch is a monitoring and logging service for the AWS ecosystem that provides visibility into your cloud resources and applications.
 
 *But why dig into another logging system?*
 
-Deploy cloudwatch2scalyr using the guide below and stream your CloudWatch Logs to Scalyr in real-time.
+Deploy the *Scalyr CloudWatch Logs Importer* using the guide below and stream your CloudWatch Logs to Scalyr in real-time.
 
 ## Features
 
-* Deploy quickly and easily using CloudFormation or the AWS Serverless Repository.
-* Automatic configuration of your logGroups to subscribe to cloudwatch2scalyr.
-* Customise Scalyr log delivery options and AWS logGroup subscription filters on a        per-logGroup basis, or by using wildcard matching/regex.
+* Deploy quickly and easily using CloudFormation.
+* Automatic configuration of your logGroups to subscribe to the *CloudWatch Streamer* Lambda function.
+* Customise Scalyr log delivery options and AWS logGroup subscription filters on a per-logGroup basis, or by using wildcard matching/regex.
 
 ## Requirements
 
-1. An application, service, or resource that is currently sending logs to
-   CloudWatch.
+1. An application, service, or resource that is currently sending logs to CloudWatch.
 2. A Scalyr Write Logs API key.
 
 ## Deployment
 
-### Deploy Using the AWS Serverless Repository
-
-> Coming soon
-
 ### Using CloudFormation
 
-1. [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#stacks/create/review?stackName=cloudwatch2scalyr&templateURL=https://s3.amazonaws.com/devcloudwatch2scalyr/cloudformation-template.yml)
+1. Click -> [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#stacks/create/review?stackName=ScalyrCloudWatchLogsImporter&templateURL=https://s3.amazonaws.com/devcloudwatch2scalyr/cloudformation-template.yml)
 2. Change the region on the top right of the console if required:
 
    ![Region](readme-images/region.png)
-3. You must set either the `WriteLogsKey` or `WriteLogsKeyEncrypted` parameter using your      Scalyr logs API key that has write privileges to Scalyr logs.
+3. You must set either the `WriteLogsKey` or `WriteLogsKeyEncrypted` parameter using your Scalyr logs API key that has write privileges to Scalyr logs.
 
     ![Parameters](readme-images/parameters.png)
     * You can encrypt your Scalyr WriteLogsKey with KMS using [aws-cli](https://aws.amazon.com/cli/):
@@ -62,22 +56,22 @@ Deploy cloudwatch2scalyr using the guide below and stream your CloudWatch Logs t
       * Simply use the `CiphertextBlob` output for the `WriteLogsKeyEncrypted` parameter
 
 4. That's all!
-    * However you wont see anything in the Scalyr dashboard until your CloudWatch logGroups have been configured to stream logs to cloudwatch2scalyr
+    * However you wont see anything in the Scalyr dashboard until your CloudWatch logGroups have been configured to stream logs to the *CloudWatch Streamer* Lambda function
 
     * For each logGroup that you want to stream to Scalyr you'll have to
-    [Create a Subscription Filter](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#LambdaFunctionExample).  You can do this through the `aws-cli` or the Console.
+    [Create a Subscription Filter](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/SubscriptionFilters.html#LambdaFunctionExample). You can do this through the `aws-cli` or the Console.
 
-      **However cloudwatch2scalyr can also do this for you!!**
+      **However** *Scalyr CloudWatch Logs Importer* can also do this for you!!
 
-    * See the configuration parameters described below, specifically `AutoSubscribeLogGroups` and `LogGroupOptions`
+      * See the configuration parameters described below, specifically `AutoSubscribeLogGroups` and `LogGroupOptions`
 
 ## Configuration
 
-cloudwatch2scalyr only needs to know your Scalyr Write Logs API Key to be able to operate. However if you'd like to customise how your logs are delivered, you are able to do that using the parameters described below:
+The *Scalyr CloudWatch Logs Importer* only needs to know your Scalyr Write Logs API Key to be able to operate. However if you'd like to customise how your logs are delivered, you are able to do that using the parameters described below:
 
 Parameter | Default | Description
 ------------ | ------------- | ------------
-AutoSubscribeLogGroups | false | Automatically subscribe the logGroups defined in LogGroupOptions to the cloudwatch2scalyr lambda
+AutoSubscribeLogGroups | false | Automatically subscribe the logGroups defined in LogGroupOptions to the CloudWatch Streamer Lambda function
 BaseUrl | https://www.scalyr.com/ | Base URL of the Scalyr API
 Debug | false | Enable debug logging of each request
 LogGroupOptions | {} | Valid JSON string to customise log delivery
@@ -134,12 +128,12 @@ Parameter | Default | Description
 serverHost | cloudwatch-{account_id} | Specifies the server name
 logfile | logGroup name from CloudWatch | Specifies the log file name
 parser | cloudWatchLogs | See the [Scalyr Documentation](https://www.scalyr.com/help/parsing-logs)
-filterName | cloudwatch2scalyr | The name of the AWS Subscription Filter
+filterName | cloudWatchLogs | The name of the AWS Subscription Filter
 filterPattern | "" | See the [AWS Documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)
 
-### Automatically subscribing CloudWatch logGroups to cloudwatch2scalyr
+### Automatically subscribing CloudWatch logGroups
 
-1. `AutoSubscribeLogGroups` works in conjunction with `LogGroupOptions`.  You'll need set       it to `true` and then provide a JSON string to the `LogGroupOptions` parameter              specifying which logGroups to subscribe.  You can also provide a valid `filterPattern`      and `filterName` as described in the
+1. `AutoSubscribeLogGroups` works in conjunction with `LogGroupOptions`.  You'll need set it to `true` and then provide a JSON string to the `LogGroupOptions` parameter specifying which logGroups to subscribe. You can also provide a valid `filterPattern` and `filterName` as described in the
     [CloudWatch Documenatation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)
 
     ```javascript
@@ -158,9 +152,9 @@ filterPattern | "" | See the [AWS Documentation](https://docs.aws.amazon.com/Ama
 **Note:**
 
   1. Any ommitted fields will [use the defaults](#loggroupoptions-defaults)
-  2. Any existing logGroup matching the supplied regex will be subscribed to                   cloudwatch2scalyr as part of the Cloudformation stack deployment
+  2. Any existing logGroup matching the supplied regex will be subscribed to the *CloudWatch Streamer* Lambda function as part of the CloudFormation stack deployment
 
 ## Troubleshooting
 
 1. Enable `debug` in the Stack parameters and review the
-   [CloudWatch logGroup](https://console.aws.amazon.com/cloudwatch/home) output for the cloudwatch2scalyr function
+   [CloudWatch logGroup](https://console.aws.amazon.com/cloudwatch/home) output for the *Scalyr CloudWatch Logs Importer* Lambda function
