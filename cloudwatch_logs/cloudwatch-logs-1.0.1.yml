@@ -62,21 +62,9 @@ Parameters:
       write access to Scalyr logs
     Type: String
 Resources:
-  CloudWatch2ScalyrPermission:
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName:
-        Ref: CloudWatchStreamerFunction
-      Principal:
-        Fn::Sub: logs.${AWS::Region}.amazonaws.com
-      SourceAccount:
-        Ref: AWS::AccountId
-      SourceArn:
-        Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*
-    Type: AWS::Lambda::Permission
   CloudWatchStreamerFunction:
     Properties:
-      CodeUri: s3://devcloudwatch2scalyr/cloudwatch_logs/56bf224c2852ed216a44647e728331ad
+      CodeUri: s3://scalyr-aws-serverless/cloudwatch_logs/fc8bb8ca8ccfc813dcd97b7adeb2740a
       Environment:
         Variables:
           BASE_URL:
@@ -102,14 +90,18 @@ Resources:
     Type: AWS::Serverless::Function
   CloudWatchSubscriber:
     Properties:
+      AccountId:
+        Ref: AWS::AccountId
       AutoSubscribeLogGroups:
         Ref: AutoSubscribeLogGroups
       DestinationArn:
         Fn::GetAtt:
-        - CloudWatchSubscriberFunction
+        - CloudWatchStreamerFunction
         - Arn
       LogGroupOptions:
         Ref: LogGroupOptions
+      Region:
+        Ref: AWS::Region
       ServiceToken:
         Fn::GetAtt:
         - CloudWatchSubscriberFunction
@@ -117,13 +109,27 @@ Resources:
     Type: Custom::CustomResource
   CloudWatchSubscriberFunction:
     Properties:
-      CodeUri: s3://devcloudwatch2scalyr/cloudwatch_logs/f0640b361f99d212ce7b8c7e28ce78af
+      CodeUri: s3://scalyr-aws-serverless/cloudwatch_logs/b8fab41dab343214cf464c6b49f2a55c
       Handler: main.lambda_handler
       Policies:
-      - Ref: LogGroupSubscriptionPolicy
+      - Ref: CloudWatchSubscriberPolicy
       Runtime: python3.7
       Timeout: 300
     Type: AWS::Serverless::Function
+  CloudWatchSubscriberPolicy:
+    Properties:
+      PolicyDocument:
+        Statement:
+        - Action:
+          - lambda:AddPermission
+          - lambda:RemovePermission
+          - logs:DescribeLogGroups
+          - logs:DeleteSubscriptionFilter
+          - logs:PutSubscriptionFilter
+          Effect: Allow
+          Resource: '*'
+        Version: 2012-10-17
+    Type: AWS::IAM::ManagedPolicy
   KMSDecryptPolicy:
     Properties:
       PolicyDocument:
@@ -133,18 +139,6 @@ Resources:
           Effect: Allow
           Resource:
             Fn::Sub: arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*
-        Version: 2012-10-17
-    Type: AWS::IAM::ManagedPolicy
-  LogGroupSubscriptionPolicy:
-    Properties:
-      PolicyDocument:
-        Statement:
-        - Action:
-          - logs:DescribeLogGroups
-          - logs:DeleteSubscriptionFilter
-          - logs:PutSubscriptionFilter
-          Effect: Allow
-          Resource: '*'
         Version: 2012-10-17
     Type: AWS::IAM::ManagedPolicy
 Transform: AWS::Serverless-2016-10-31

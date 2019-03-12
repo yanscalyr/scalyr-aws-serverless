@@ -33,7 +33,7 @@ Deploy the *Scalyr CloudWatch Logs Importer* using the guide below and stream yo
 
 ### Using CloudFormation
 
-1. Click -> [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#stacks/create/review?stackName=ScalyrCloudWatchLogsImporter&templateURL=https://s3.amazonaws.com/devcloudwatch2scalyr/cloudformation-template.yml)
+1. Click -> [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#stacks/create/review?stackName=ScalyrCloudWatchLogsImporter&templateURL=https://s3.amazonaws.com/scalyr-aws-serverless/cloudwatch_logs/cloudwatch-logs-1.0.1.yml)
 2. Change the region on the top right of the console if required:
 
    ![Region](readme-images/region.png)
