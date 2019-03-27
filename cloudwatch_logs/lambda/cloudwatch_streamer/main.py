@@ -59,8 +59,8 @@ LOG_GROUP_OPTIONS = json.loads(LOG_GROUP_OPTIONS)
 class CloudWatchStreamerException(Exception):
     """A custom exception class to print extra context before exiting"""
 
-    def __init__(self, message, context=''):
-        LOGGER.exception(f"CloudWatch Streamer Exception: {message}")
+    def __init__(self, message, context='', level=logging.ERROR, exc_info=True):
+        LOGGER.log(level, f"CloudWatch Streamer Exception: {message}", exc_info=exc_info)
         if DEBUG and context != '':
             print(f"Exception Context: \n\n{context}\n\n", file=sys.stderr)
         logging.shutdown()
@@ -139,12 +139,22 @@ def decode_response_body(r):
     @type r: urllib.response
 
     @return: The uploadLogs API utf-8 decoded response body
-    @rtype: dict
+    @rtype: dict if Scalyr returns JSON, str if not
     """
+    raw_body = r.read()
     try:
-        decoded_body = json.loads(r.read().decode('utf-8'))
+        decoded_body = json.loads(raw_body.decode('utf-8'))
+    except json.decoder.JSONDecodeError:
+        # Scalyr has returned a non-json response, usually a temporary issue
+        # Lambda will automatically retry the invocation twice, with delays between retries
+        raise CloudWatchStreamerException(
+            'Problem communicating with Scalyr uploadLogs API. Request will be retried twice',
+            raw_body,
+            level=logging.INFO,
+            exc_info=False
+        )
     except:
-        raise CloudWatchStreamerException('Couldn\'t decode response body', r.read())
+        raise CloudWatchStreamerException('Couldn\'t decode response body', raw_body)
     else:
         return decoded_body
 
