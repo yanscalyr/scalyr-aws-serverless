@@ -139,12 +139,13 @@ def decode_response_body(r):
     @type r: urllib.response
 
     @return: The uploadLogs API utf-8 decoded response body
-    @rtype: dict
+    @rtype: str
     """
+    raw_body = r.read()
     try:
-        decoded_body = json.loads(r.read().decode('utf-8'))
+        decoded_body = raw_body.decode('utf-8')
     except:
-        raise CloudWatchStreamerException('Couldn\'t decode response body', r.read())
+        raise CloudWatchStreamerException('Couldn\'t decode response body', raw_body)
     else:
         return decoded_body
 
