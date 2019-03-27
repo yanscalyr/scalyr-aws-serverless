@@ -64,7 +64,7 @@ Parameters:
 Resources:
   CloudWatchStreamerFunction:
     Properties:
-      CodeUri: s3://scalyr-aws-serverless/cloudwatch_logs/fc8bb8ca8ccfc813dcd97b7adeb2740a
+      CodeUri: s3://scalyr-aws-serverless/cloudwatch_logs/d033adb1bd861a383b186940ff5cfe57
       Environment:
         Variables:
           BASE_URL:

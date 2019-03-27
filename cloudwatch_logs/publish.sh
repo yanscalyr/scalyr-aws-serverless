@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 BUCKET=scalyr-aws-serverless
 PREFIX=cloudwatch_logs
-VERSION=1.0.1
+VERSION=1.0.2
 
 aws cloudformation package --template-file sam-template.yml \
     --output-template-file cloudwatch-logs-$VERSION.yml \
