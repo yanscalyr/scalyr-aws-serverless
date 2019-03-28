@@ -35,6 +35,70 @@ Parameters:
     Default: false
     AllowedValues: [true, false]
 
+Mappings:
+  RegionMap:
+    us-east-1:
+      bucket: 'scalyr-aws-serverless'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    us-east-2:
+      bucket: 'scalyr-aws-serverless-us-east-2'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    us-west-1:
+      bucket: 'scalyr-aws-serverless-us-west-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    us-west-2:
+      bucket: 'scalyr-aws-serverless-us-west-2'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    ap-south-1:
+      bucket: 'scalyr-aws-serverless-ap-south-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    ap-northeast-2:
+      bucket: 'scalyr-aws-serverless-ap-northeast-2'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    ap-southeast-1:
+      bucket: 'scalyr-aws-serverless-ap-southeast-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    ap-northeast-1:
+      bucket: 'scalyr-aws-serverless-ap-northeast-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    ca-central-1:
+      bucket: 'scalyr-aws-serverless-ca-central-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    eu-central-1:
+      bucket: 'scalyr-aws-serverless-eu-central-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    eu-west-1:
+      bucket: 'scalyr-aws-serverless-eu-west-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    eu-west-2:
+      bucket: 'scalyr-aws-serverless-eu-west-2'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    eu-west-3:
+      bucket: 'scalyr-aws-serverless-eu-west-3'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    eu-north-1:
+      bucket: 'scalyr-aws-serverless-eu-north-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+    sa-east-1:
+      bucket: 'scalyr-aws-serverless-sa-east-1'
+      prefix: 'cloudwatch_logs'
+      version: 1.0.2
+
+
 Conditions:
   WriteLogsKeyPlaintext:
     !Not [!Equals [!Ref WriteLogsKey, '']]
@@ -61,7 +125,13 @@ Resources:
     Properties:
       Runtime: python3.7
       Handler: main.lambda_handler
-      CodeUri: ./lambda/cloudwatch_subscriber
+      CodeUri:
+        Bucket: !FindInMap [RegionMap, !Ref 'AWS::Region', bucket]
+        Key:
+          Fn::Sub:
+          - "${Prefix}/Subscriber-${Version}.zip"
+          - Prefix: !FindInMap [RegionMap, !Ref 'AWS::Region', prefix]
+            Version: !FindInMap [RegionMap, !Ref 'AWS::Region', version]
       Timeout: 300
       Policies:
         - !Ref CloudWatchSubscriberPolicy
@@ -89,7 +159,13 @@ Resources:
     Properties:
       Runtime: python3.7
       Handler: main.lambda_handler
-      CodeUri: ./lambda/cloudwatch_streamer
+      CodeUri:
+        Bucket: !FindInMap [RegionMap, !Ref 'AWS::Region', bucket]
+        Key:
+          Fn::Sub:
+          - "${Prefix}/Streamer-${Version}.zip"
+          - Prefix: !FindInMap [RegionMap, !Ref 'AWS::Region', prefix]
+            Version: !FindInMap [RegionMap, !Ref 'AWS::Region', version]
       Policies:
         - !Ref KMSDecryptPolicy
       Environment:
