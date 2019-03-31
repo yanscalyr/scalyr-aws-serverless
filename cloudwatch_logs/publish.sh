@@ -51,4 +51,4 @@ done
 rm $APP_DIR/lambda/cloudwatch_streamer/Archive.zip
 rm $APP_DIR/lambda/cloudwatch_subscriber/Archive.zip
 
-echo -e "\nupdate templateURL in README.md: https://s3.amazonaws.com/${BUCKETS[0]}/cloudwatch_logs/cloudwatch-logs-$VERSION.yml"
+echo -e "\nupdate templateURL in README.md: https://s3.amazonaws.com/${BUCKETS[0]}/$PREFIX/cloudwatch-logs-$VERSION.yml"
