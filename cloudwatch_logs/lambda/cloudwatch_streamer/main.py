@@ -71,7 +71,7 @@ def build_req_headers():
     if DEBUG == 'true':
         id = ENVIRONMENT_ID
         return {
-            'Content-Type': 'text/plain'
+            'Content-Type': 'text/plain',
             'User-Agent': f"cloudwatch-log-debug-streamer-{id}"
         }
     else:
