@@ -60,16 +60,24 @@ class CloudWatchStreamerException(Exception):
     """A custom exception class to print extra context before exiting"""
 
     def __init__(self, message, context='', level=logging.ERROR, exc_info=True):
-        LOGGER.log(level, f"CloudWatch Streamer Exception: {message}", exc_info=exc_info)
+        id = ENVIRONMENT_ID
+        LOGGER.log(level, f"CloudWatch Streamer Exception{id}: {message}", exc_info=exc_info)
         if DEBUG and context != '':
             print(f"Exception Context: \n\n{context}\n\n", file=sys.stderr)
 
 
 def build_req_headers():
     """Returns the request headers to be used for the Scalyr uploadLogs API request"""
-    return {
-        'Content-Type': 'text/plain'
-    }
+    if DEBUG == 'true':
+        id = ENVIRONMENT_ID
+        return {
+            'Content-Type': 'text/plain'
+            'User-Agent': f"cloudwatch-log-debug-streamer-{id}"
+        }
+    else:
+        return {
+            'Content-Type': 'text/plain'
+        }
 
 
 def encode_url_params(params):
