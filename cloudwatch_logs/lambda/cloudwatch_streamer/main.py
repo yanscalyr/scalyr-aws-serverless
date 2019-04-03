@@ -63,8 +63,6 @@ class CloudWatchStreamerException(Exception):
         LOGGER.log(level, f"CloudWatch Streamer Exception: {message}", exc_info=exc_info)
         if DEBUG and context != '':
             print(f"Exception Context: \n\n{context}\n\n", file=sys.stderr)
-        logging.shutdown()
-        sys.exit(1)
 
 
 def build_req_headers():
