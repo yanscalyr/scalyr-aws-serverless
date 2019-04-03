@@ -35,69 +35,14 @@ Parameters:
     Default: false
     AllowedValues: [true, false]
 
+# BEGIN MAPPINGS  (do not change comment, publish.sh depends on this)
 Mappings:
   RegionMap:
     us-east-1:
       bucket: 'scalyr-aws-serverless'
       prefix: 'cloudwatch_logs'
       version: 1.0.2
-    us-east-2:
-      bucket: 'scalyr-aws-serverless-us-east-2'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    us-west-1:
-      bucket: 'scalyr-aws-serverless-us-west-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    us-west-2:
-      bucket: 'scalyr-aws-serverless-us-west-2'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    ap-south-1:
-      bucket: 'scalyr-aws-serverless-ap-south-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    ap-northeast-2:
-      bucket: 'scalyr-aws-serverless-ap-northeast-2'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    ap-southeast-1:
-      bucket: 'scalyr-aws-serverless-ap-southeast-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    ap-northeast-1:
-      bucket: 'scalyr-aws-serverless-ap-northeast-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    ca-central-1:
-      bucket: 'scalyr-aws-serverless-ca-central-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    eu-central-1:
-      bucket: 'scalyr-aws-serverless-eu-central-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    eu-west-1:
-      bucket: 'scalyr-aws-serverless-eu-west-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    eu-west-2:
-      bucket: 'scalyr-aws-serverless-eu-west-2'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    eu-west-3:
-      bucket: 'scalyr-aws-serverless-eu-west-3'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    eu-north-1:
-      bucket: 'scalyr-aws-serverless-eu-north-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-    sa-east-1:
-      bucket: 'scalyr-aws-serverless-sa-east-1'
-      prefix: 'cloudwatch_logs'
-      version: 1.0.2
-
+# END MAPPINGS    (do not change comment, publish.sh depends on this)
 
 Conditions:
   WriteLogsKeyPlaintext:
