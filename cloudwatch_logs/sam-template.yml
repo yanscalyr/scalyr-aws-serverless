@@ -111,6 +111,7 @@ Resources:
           - "${Prefix}/Streamer-${Version}.zip"
           - Prefix: !FindInMap [RegionMap, !Ref 'AWS::Region', prefix]
             Version: !FindInMap [RegionMap, !Ref 'AWS::Region', version]
+      Timeout: 60
       Policies:
         - !Ref KMSDecryptPolicy
       Environment:
