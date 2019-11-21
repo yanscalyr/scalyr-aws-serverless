@@ -25,7 +25,7 @@ Parameters:
     Type: String
     Default: '{}'
   AutoSubscribeLogGroups:
-    Description: Automatically subscribe the logGroups defined in LogGroupOptions to the CloudWatch Streamer Lambda function
+    Description: Automatically subscribe the logGroups defined in LogGroupOptions to the CloudWatch Streamer Lambda function (CloudTrail logging must be enabled for any future logGroups to be automatically subscribed)
     Type: String
     Default: false
     AllowedValues: [true, false]
@@ -51,6 +51,30 @@ Conditions:
     !Not [!Equals [!Ref WriteLogsKeyEncrypted, '']]
 
 Resources:
+  CloudWatchStreamerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.7
+      Handler: main.lambda_handler
+      CodeUri:
+        Bucket: !FindInMap [RegionMap, !Ref 'AWS::Region', bucket]
+        Key:
+          Fn::Sub:
+            - "${Prefix}/Streamer-${Version}.zip"
+            - Prefix: !FindInMap [RegionMap, !Ref 'AWS::Region', prefix]
+              Version: !FindInMap [RegionMap, !Ref 'AWS::Region', version]
+      Timeout: 60
+      Policies:
+        - !Ref KMSDecryptPolicy
+      Environment:
+        Variables:
+          BASE_URL: !Ref BaseUrl
+          WRITE_LOGS_KEY:
+            Fn::If: [WriteLogsKeyPlaintext, !Ref WriteLogsKey, !Ref 'AWS::NoValue']
+          WRITE_LOGS_KEY_ENCRYPTED:
+            Fn::If: [WriteLogsKeyEncrypted, !Ref WriteLogsKeyEncrypted, !Ref 'AWS::NoValue']
+          LOG_GROUP_OPTIONS: !Ref LogGroupOptions
+          DEBUG: !Ref Debug
   CloudWatchSubscriberPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -80,6 +104,25 @@ Resources:
       Timeout: 300
       Policies:
         - !Ref CloudWatchSubscriberPolicy
+      Events:
+        LambdaTrigger:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+                - aws.logs
+              detail:
+                eventSource:
+                  - logs.amazonaws.com
+                eventName:
+                  - CreateLogGroup
+      Environment:
+        Variables:
+          AUTO_SUBSCRIBE_LOG_GROUPS: !Ref AutoSubscribeLogGroups
+          LOG_GROUP_OPTIONS: !Ref LogGroupOptions
+          AWS_ACCOUNT_ID: !Ref 'AWS::AccountId'
+          DESTINATION_ARN: !GetAtt CloudWatchStreamerFunction.Arn
+
   CloudWatchSubscriber:
     Type: Custom::CustomResource
     Properties:
@@ -99,30 +142,6 @@ Resources:
             Action:
               - 'kms:Decrypt'
             Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*'
-  CloudWatchStreamerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Runtime: python3.7
-      Handler: main.lambda_handler
-      CodeUri:
-        Bucket: !FindInMap [RegionMap, !Ref 'AWS::Region', bucket]
-        Key:
-          Fn::Sub:
-          - "${Prefix}/Streamer-${Version}.zip"
-          - Prefix: !FindInMap [RegionMap, !Ref 'AWS::Region', prefix]
-            Version: !FindInMap [RegionMap, !Ref 'AWS::Region', version]
-      Timeout: 60
-      Policies:
-        - !Ref KMSDecryptPolicy
-      Environment:
-        Variables:
-          BASE_URL: !Ref BaseUrl
-          WRITE_LOGS_KEY:
-            Fn::If: [WriteLogsKeyPlaintext, !Ref WriteLogsKey, !Ref 'AWS::NoValue']
-          WRITE_LOGS_KEY_ENCRYPTED:
-            Fn::If: [WriteLogsKeyEncrypted, !Ref WriteLogsKeyEncrypted, !Ref 'AWS::NoValue']
-          LOG_GROUP_OPTIONS: !Ref LogGroupOptions
-          DEBUG: !Ref Debug
 
 Outputs:
   CloudWatchStreamerArn:

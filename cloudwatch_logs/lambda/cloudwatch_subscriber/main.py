@@ -19,6 +19,7 @@
 # Scalyr CloudWatch Streamer Lambda Function
 #
 # author: Tom Gardiner <tom@teppen.io>
+import os
 import re
 import json
 import boto3
@@ -331,12 +332,13 @@ def process_cf_event(event):
     @param event: The AWS event containing the CloudFormation event metadata
     @type event: dict
     """
-    auto_subscribe_log_groups = event['ResourceProperties']['AutoSubscribeLogGroups']
-    destination_arn = event['ResourceProperties']['DestinationArn']
-    account_id = event['ResourceProperties']['AccountId']
-    region = event['ResourceProperties']['Region']
 
+    auto_subscribe_log_groups = event['ResourceProperties']['AutoSubscribeLogGroups']
     if auto_subscribe_log_groups == 'true':
+        destination_arn = event['ResourceProperties']['DestinationArn']
+        account_id = event['ResourceProperties']['AccountId']
+        region = event['ResourceProperties']['Region']
+
         aws_log_groups = get_log_groups()
         log_group_options = load_log_group_options(event, 'ResourceProperties')
         matched_log_group_options = match_log_groups(aws_log_groups, log_group_options)
@@ -372,6 +374,29 @@ def process_cf_event(event):
                 delete_subscription_filter(log_group_name, options)
                 lambda_remove_permission(log_group_name, destination_arn)
 
+def process_create_log_group_event(event):
+    """Processes a CloudWatch CreateLogGroup event
+
+    Subscribes the new log group.
+
+    @param event: The AWS event containing the CloudWatch event metadata
+    @type event: dict
+    """
+    if os.environ['AUTO_SUBSCRIBE_LOG_GROUPS'] == 'true':
+        log_group_name = event["detail"]["requestParameters"]["logGroupName"]
+        try:
+            log_group_options = json.loads(os.environ['LOG_GROUP_OPTIONS'])
+        except:
+            LOGGER.exception(f"Error loading LogGroupOptions")
+            raise
+        else:
+            LOGGER.info(f"Loaded LogGroupOptions: " + json.dumps(log_group_options))
+
+        matched_group_options = match_log_groups([log_group_name], log_group_options)
+        for log_group_name, options in matched_group_options.items():
+            lambda_add_permission(log_group_name, os.environ['DESTINATION_ARN'], os.environ['AWS_ACCOUNT_ID'], os.environ['AWS_REGION'])
+            put_subscription_filter(log_group_name, options, os.environ['DESTINATION_ARN'])
+
 
 def lambda_handler(event, context):
     """Invoked by AWS to process the event and associated context
@@ -397,10 +422,17 @@ def lambda_handler(event, context):
     LOGGER.info('Recieved CF event: ' + json.dumps(event))
     signal.alarm(int(context.get_remaining_time_in_millis() / 1000) - LAMBDA_TIMEOUT)
 
+    send_response = False
     try:
-        process_cf_event(event)
+        if "StackId" in event and "RequestType" in event and "ResourceType" in event:
+            send_response = True
+            process_cf_event(event)
+        else:
+            process_create_log_group_event(event)
     except:
-        send_resp(event, context, "FAILED")
+        if send_response:
+            send_resp(event, context, "FAILED")
     else:
-        send_resp(event, context, "SUCCESS")
-        signal.alarm(0)
+        if send_response:
+            send_resp(event, context, "SUCCESS")
+            signal.alarm(0)

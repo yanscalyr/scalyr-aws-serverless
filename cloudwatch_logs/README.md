@@ -28,6 +28,8 @@ Deploy the *Scalyr CloudWatch Logs Importer* using the guide below and stream yo
 
 1. An application, service, or resource that is currently sending logs to CloudWatch.
 2. A Scalyr Write Logs API key.
+3. (Optional) If you chose to enable `AutoSubscribeLogGroups` in the configuration, you will need CloudTrail logging
+enabled (have at least one trail) for any future log groups to be auto-subscribed.
 
 ## Deployment
 
@@ -153,6 +155,7 @@ filterPattern | "" | See the [AWS Documentation](https://docs.aws.amazon.com/Ama
 
   1. Any ommitted fields will [use the defaults](#loggroupoptions-defaults)
   2. Any existing logGroup matching the supplied regex will be subscribed to the *CloudWatch Streamer* Lambda function as part of the CloudFormation stack deployment
+  3. CloudTrail logging must be enabled for any future logGroups to be automatically subscribed to the *CloudWatch Streamer* Lambda
 
 ## Troubleshooting
 
