@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-BUCKETS="scalyr-aws-serverless-us-west-1,scalyr-aws-serverless-us-west-2,scalyr-aws-serverless-ap-south-1,scalyr-aws-serverless-ap-northeast-2,scalyr-aws-serverless-ap-southeast-1,scalyr-aws-serverless-ap-northeast-1,scalyr-aws-serverless-ca-central-1,scalyr-aws-serverless-eu-central-1,scalyr-aws-serverless-eu-west-1,scalyr-aws-serverless-eu-west-2,scalyr-aws-serverless-eu-west-3,scalyr-aws-serverless-eu-north-1,scalyr-aws-serverless-sa-east-1"
+BUCKETS="scalyr-aws-serverless-us-west-1,scalyr-aws-serverless-us-west-2,scalyr-aws-serverless-ap-south-1,scalyr-aws-serverless-ap-northeast-2,scalyr-aws-serverless-ap-southeast-1,scalyr-aws-serverless-ap-northeast-1,scalyr-aws-serverless-ca-central-1,scalyr-aws-serverless-eu-central-1,scalyr-aws-serverless-eu-west-1,scalyr-aws-serverless-eu-west-2,scalyr-aws-serverless-eu-west-3,scalyr-aws-serverless-eu-north-1,scalyr-aws-serverless-sa-east-1,scalyr-aws-serverless-ap-southeast-2"
 #BUCKETS="scalyr-aws-serverless-us-east-2"
 
 IFS=',' read -ra bucket_list <<< "$BUCKETS"
