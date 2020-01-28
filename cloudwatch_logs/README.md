@@ -165,6 +165,8 @@ logfile | logGroup name from CloudWatch | Specifies the log file name
 parser | cloudWatchLogs | See the [Scalyr Documentation](https://www.scalyr.com/help/parsing-logs)
 filterName | cloudWatchLogs | The name of the AWS Subscription Filter
 filterPattern | "" | See the [AWS Documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)
+sampling_rules | {} | See the [Scalyr Agent Documentation](https://app.scalyr.com/help/scalyr-agent#filter)
+redaction_rules | {} | See the [Scalyr Agent Documentation](https://app.scalyr.com/help/scalyr-agent#redaction)
 
 ### Automatically subscribing CloudWatch logGroups
 
