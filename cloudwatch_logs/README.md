@@ -123,6 +123,39 @@ The above `LogGroupOptions` can be simplified to the below, using valid regex.
   1. You can test your regex using [Pythex](https://pythex.org/) to see which logGroups will be matched
   2. Any ommitted fields will use the defaults below
 
+#### Sampling and Redaction rules
+
+You can define Sampling and Redaction rules per logGroup using the same options described in the documentation
+of the Scalyr Agent Configuration.
+
+[Sampling documentation](https://app.scalyr.com/help/scalyr-agent#filter),
+[Redaction documentation](https://app.scalyr.com/help/scalyr-agent#redaction)
+
+```javascript
+  {
+    "/aws/lambda/myfunc_[1-9]": {
+      "parser": "my_func_parser",
+      "sampling_rules": [
+        { "match_expression": "INFO", "sampling_rate": 0.1 },
+        { "match_expression": "FINE", "sampling_rate": 0 }
+      ]
+    },
+    "/aws/lambda/other_func_[1-9]": {
+      "parser": "other_func_parser",
+      "redaction_rules": [
+        // Delete all instances of password=...
+        { "match_expression": "password=[^& ]*" },
+
+        // Replace terms like "userInfo=username password" with "userInfo=username"
+        {
+          "match_expression": "userInfo=([^ ]+) [^ ]+",
+          "replacement": "userInfo=\\1"
+        }
+      ]
+    }
+  }
+```
+
 #### LogGroupOptions defaults
 
 Parameter | Default | Description
